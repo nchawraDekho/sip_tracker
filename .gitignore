@@ -1,0 +1,46 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# build outputs
+/dist
+/build
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# editor directories and files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# optional cache directories
+.cache/
+.parcel-cache/
+vite.config.ts.timestamp-*
+eslintcache
+coverage/
+
+# temporary files
+*.tmp
+*.temp
+
+# lock files (optional - uncomment if you don’t want to track them)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# OS specific
+*.swp
