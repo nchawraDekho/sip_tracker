@@ -923,50 +923,6 @@ function App() {
           </ResponsiveContainer>
         </div>
 
-        {/* 4. Profit/Loss by SIP */}
-        <div
-          style={{
-            background: theme.cardBg,
-            borderRadius: "1rem",
-            padding: "2rem",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
-            border: `1px solid ${theme.cardBorder}`,
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "1.25rem",
-              fontWeight: "bold",
-              marginBottom: "1.5rem",
-              color: theme.text,
-            }}
-          >
-            Profit/Loss by SIP
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={profitLossBySip}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label={(entry) =>
-                  `${entry.name}: ₹${entry.value.toLocaleString()}`
-                }
-              >
-                {profitLossBySip.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.value >= 0 ? "#10b981" : "#ef4444"}
-                  />
-                ))}
-              </Pie>
-              <Tooltip formatter={(val) => `₹${val.toLocaleString("en-IN")}`} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
       </div>
 
       {/* Charts Grid - Row 3 */}
