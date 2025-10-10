@@ -210,9 +210,7 @@ function App() {
       const invested = sips
         .filter((s) => s.sipName === name)
         .reduce((acc, s) => acc + s.amount, 0);
-      const current = sips
-        .filter((s) => s.sipName === name)
-        .reduce((acc, s) => acc + s.currentAmount, 0);
+      const current = sips.findLast((s) => s.sipName === name)?.currentAmount || 0;
       const returns =
         invested > 0 ? ((current - invested) / invested) * 100 : 0;
       return { name, returns: parseFloat(returns.toFixed(2)) };
