@@ -26,5 +26,19 @@
     "currentAmount": 31495,
     "year": 2025,
     "month": "Nov"
+  },
+  {
+    "sipName": "ICICI Prudential Bluechip",
+    "amount": 8000,
+    "currentAmount": 41533,
+    "year": 2025,
+    "month": "Dec"
+  },
+  {
+    "sipName": "Parag Parikh Flexi Cap",
+    "amount": 12000,
+    "currentAmount": 43687,
+    "year": 2025,
+    "month": "Dec"
   }
 ]
