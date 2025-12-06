@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Line, Bar, Pie, Area } from "recharts";
 import {
   LineChart,
@@ -30,7 +30,68 @@ import {
 
 const COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
 
-const StatsCard = ({ theme, title, value, color, subtitle, icon }) => (
+const useHasViewed = (options = { threshold: 0.1 }) => {
+  const ref = useRef(null);
+  const [hasViewed, setHasViewed] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !hasViewed) {
+        setHasViewed(true);
+      }
+    }, options);
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      if (ref.current) {
+        observer.unobserve(ref.current);
+      }
+      observer.disconnect();
+    };
+  }, [options, hasViewed]);
+
+  return [ref, hasViewed];
+};
+
+const AnimatedNumber = ({ value, duration = 1500, prefix = '', suffix = '', decimals = 0, start = false }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (!start) {
+      setDisplayValue(0);
+      return;
+    }
+
+    let startTime = null;
+    const animate = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(Math.abs(value) * eased * (value >= 0 ? 1 : -1));
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [start, value, duration]);
+
+  const rounded = Math.round(displayValue * Math.pow(10, decimals)) / Math.pow(10, decimals);
+  const absRounded = Math.abs(rounded);
+  const sign = rounded < 0 ? '-' : '';
+  let formatted;
+  if (decimals === 0) {
+    formatted = absRounded.toLocaleString("en-IN");
+  } else {
+    formatted = absRounded.toFixed(decimals);
+  }
+  return <>{prefix}{sign}{formatted}{suffix}</>;
+};
+
+const StatsCard = ({ theme, title, value, color, subtitle, icon, hasViewed = false }) => (
   <div
     style={{
       background: theme.cardBg,
@@ -39,13 +100,16 @@ const StatsCard = ({ theme, title, value, color, subtitle, icon }) => (
       boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
       border: `1px solid ${theme.cardBorder}`,
       transition: "transform 0.2s, box-shadow 0.2s",
+      opacity: hasViewed ? 1 : 0,
+      transform: hasViewed ? 'translateY(0)' : 'translateY(20px)',
+      transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
     }}
     onMouseOver={(e) => {
       e.currentTarget.style.transform = "translateY(-4px)";
       e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.15)";
     }}
     onMouseOut={(e) => {
-      e.currentTarget.style.transform = "translateY(0)";
+      e.currentTarget.style.transform = hasViewed ? 'translateY(0)' : 'translateY(20px)';
       e.currentTarget.style.boxShadow = "0 4px 6px rgba(0,0,0,0.05)";
     }}
   >
@@ -53,13 +117,26 @@ const StatsCard = ({ theme, title, value, color, subtitle, icon }) => (
       {icon}
       {title}
     </div>
-    <div style={{ fontSize: "2rem", fontWeight: "bold", color }}>{value}</div>
-    {subtitle && <div style={{ fontSize: "0.875rem", color, marginTop: "0.25rem" }}>{subtitle}</div>}
+    <div style={{ fontSize: "2rem", fontWeight: "bold", color }}>
+      <AnimatedNumber value={value} prefix="₹" decimals={0} start={hasViewed} />
+    </div>
+    {subtitle !== undefined && (
+      <div style={{ fontSize: "0.875rem", color, marginTop: "0.25rem" }}>
+        <AnimatedNumber
+          value={subtitle}
+          prefix={subtitle >= 0 ? "+" : ""}
+          decimals={2}
+          suffix="%"
+          start={hasViewed}
+        />
+      </div>
+    )}
   </div>
 );
 
-const ChartCard = ({ theme, title, children }) => (
+const ChartCard = React.forwardRef(({ theme, title, children, hasViewed = false }, ref) => (
   <div
+    ref={ref}
     style={{
       background: theme.cardBg,
       borderRadius: "1rem",
@@ -67,12 +144,25 @@ const ChartCard = ({ theme, title, children }) => (
       marginBottom: "3rem",
       boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
       border: `1px solid ${theme.cardBorder}`,
+      opacity: hasViewed ? 1 : 0,
+      transform: hasViewed ? 'translateY(0)' : 'translateY(30px)',
+      transition: 'opacity 0.6s ease-out, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
     }}
   >
     <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem", color: theme.text }}>{title}</h2>
-    {children}
+    <div
+      style={{
+        opacity: hasViewed ? 1 : 0.3,
+        transform: hasViewed ? 'translateY(0)' : 'translateY(20px)',
+        transition: 'opacity 0.8s ease-out, transform 0.8s ease-out',
+      }}
+    >
+      {children}
+    </div>
   </div>
-);
+));
+
+ChartCard.displayName = 'ChartCard';
 
 const CustomTooltip = ({ active, payload, theme }) => {
   if (active && payload && payload.length) {
@@ -164,7 +254,7 @@ function CustomSelect({ value, onValueChange, options, placeholder, theme }) {
               >
                 <Select.ItemText>{option}</Select.ItemText>
                 <Select.ItemIndicator>
-                  <Check size={16} color="#10b981" />
+                  <Check size={16} color="#10b6d4" />
                 </Select.ItemIndicator>
               </Select.Item>
             ))}
@@ -184,6 +274,17 @@ function App() {
   const [sips, setSips] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const [statsRef, statsHasViewed] = useHasViewed({ threshold: 0.3 });
+  const [growthRef, growthHasViewed] = useHasViewed();
+  const [allocRef, allocHasViewed] = useHasViewed();
+  const [trendRef, trendHasViewed] = useHasViewed();
+  const [sipGrowthRef, sipGrowthHasViewed] = useHasViewed();
+  const [profitRef, profitHasViewed] = useHasViewed();
+  const [returnsRef, returnsHasViewed] = useHasViewed();
+  const [yearRef, yearHasViewed] = useHasViewed();
+  const [flowRef, flowHasViewed] = useHasViewed();
+  const [tableRef, tableHasViewed] = useHasViewed();
 
   const sipOptions = ["Parag Parikh Flexi Cap", "ICICI Prudential Bluechip"];
   const yearOptions = ["2025", "2026", "2027"];
@@ -306,6 +407,8 @@ function App() {
     prevCurrentForProfit = monthCurrentTotal;
   });
 
+  const filteredMonthlyProfits = monthlyProfits.filter((p) => p.profit !== 0);
+
   let lastKnownCurrent = 0;
   fullPeriods.forEach((label) => {
     const [m, yStr] = label.split("-");
@@ -344,6 +447,8 @@ function App() {
     return { month: label, amount: total };
   });
 
+  const zeroMonthlyTrend = monthlyTrend.map((d) => ({ ...d, amount: 0 }));
+
   const avgMonthlyInvestment = monthlyTrend.length > 0 ? monthlyTrend.reduce((acc, m) => acc + m.amount, 0) / monthlyTrend.length : 0;
 
   const sipWiseGrowth = fullPeriods.map((label) => {
@@ -355,6 +460,14 @@ function App() {
       dataPoint[name] = sipData.reduce((acc, s) => acc + s.amount, 0);
     });
     return dataPoint;
+  });
+
+  const zeroSipGrowth = sipWiseGrowth.map((d) => {
+    const zd = { month: d.month };
+    sipNames.forEach((name) => {
+      zd[name] = 0;
+    });
+    return zd;
   });
 
   const returnsComparison = sipNames
@@ -384,6 +497,8 @@ function App() {
     const amount = monthTotals[`${m}-${y}`] || 0;
     return { month: label, amount };
   });
+
+  const zeroSipFlow = monthlySipFlow.map((d) => ({ ...d, amount: 0 }));
 
   const healthPercent = profitLossPercent;
   const healthColor = healthPercent >= 15 ? "#10b981" : healthPercent >= 5 ? "#f59e0b" : healthPercent >= 0 ? "#3b82f6" : "#ef4444";
@@ -443,6 +558,8 @@ function App() {
     cancelText: isDarkMode ? "#f1f5f9" : "#1e293b",
     emptyCell: isDarkMode ? "#475569" : "#94a3b8",
   };
+
+  const zeroChartData = chartData.map((d) => ({ ...d, invested: 0, current: 0 }));
 
   return (
     <div style={{ minHeight: "100vh", background: theme.bg, color: theme.text, padding: "2rem" }}>
@@ -585,16 +702,17 @@ function App() {
         </div>
 
         {/* Stats Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem", marginBottom: "3rem" }}>
-          <StatsCard theme={theme} title="Total Invested" value={`₹${overallTotal.toLocaleString("en-IN")}`} color="#3b82f6" />
-          <StatsCard theme={theme} title="Current Value" value={`₹${overallCurrentTotal.toLocaleString("en-IN")}`} color="#8b5cf6" />
+        <div ref={statsRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.5rem", marginBottom: "3rem" }}>
+          <StatsCard theme={theme} title="Total Invested" value={overallTotal} color="#3b82f6" hasViewed={statsHasViewed} />
+          <StatsCard theme={theme} title="Current Value" value={overallCurrentTotal} color="#8b5cf6" hasViewed={statsHasViewed} />
           <StatsCard
             theme={theme}
             title="Profit/Loss"
-            value={`₹${profitLoss.toLocaleString("en-IN")}`}
+            value={profitLoss}
             color={profitLoss >= 0 ? "#10b981" : "#ef4444"}
-            subtitle={`${profitLoss >= 0 ? "+" : ""}${profitLossPercent.toFixed(2)}%`}
+            subtitle={profitLossPercent}
             icon={profitLoss >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+            hasViewed={statsHasViewed}
           />
           <div
             style={{
@@ -604,29 +722,34 @@ function App() {
               boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
               border: `1px solid ${theme.cardBorder}`,
               transition: "transform 0.2s, box-shadow 0.2s",
+              opacity: statsHasViewed ? 1 : 0,
+              transform: statsHasViewed ? 'translateY(0)' : 'translateY(20px)',
+              transition: 'opacity 0.6s ease-out, transform 0.6s ease-out',
             }}
             onMouseOver={(e) => {
               e.currentTarget.style.transform = "translateY(-4px)";
               e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.15)";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.transform = statsHasViewed ? 'translateY(0)' : 'translateY(20px)';
               e.currentTarget.style.boxShadow = "0 4px 6px rgba(0,0,0,0.05)";
             }}
           >
             <div style={{ fontSize: "0.875rem", color: theme.mutedText, marginBottom: "0.5rem" }}>Portfolio Health</div>
             <div style={{ fontSize: "2rem", fontWeight: "bold", color: healthColor }}>{healthStatus}</div>
             <div style={{ width: "100%", height: "8px", background: isDarkMode ? "rgba(255,255,255,0.1)" : "#e2e8f0", borderRadius: "999px", marginTop: "0.75rem", overflow: "hidden" }}>
-              <div style={{ width: `${Math.min(Math.max(healthPercent + 50, 0), 100)}%`, height: "100%", background: healthColor, transition: "width 0.3s" }}></div>
+              <div style={{ width: `${statsHasViewed ? Math.min(Math.max(healthPercent + 50, 0), 100) : 0}%`, height: "100%", background: healthColor, transition: "width 1.5s ease-out" }}></div>
             </div>
-            <div style={{ fontSize: "0.75rem", color: theme.mutedText, marginTop: "0.5rem" }}>Returns: {profitLossPercent.toFixed(2)}%</div>
+            <div style={{ fontSize: "0.75rem", color: theme.mutedText, marginTop: "0.5rem" }}>
+              Returns: <AnimatedNumber value={profitLossPercent} prefix={profitLoss >= 0 ? "+" : ""} decimals={2} suffix="%" start={statsHasViewed} />
+            </div>
           </div>
         </div>
 
         {/* Portfolio Growth with Gradient */}
-        <ChartCard theme={theme} title="Portfolio Growth (Cumulative)">
+        <ChartCard ref={growthRef} theme={theme} title="Portfolio Growth (Cumulative)" hasViewed={growthHasViewed}>
           <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={chartData}>
+            <AreaChart data={growthHasViewed ? chartData : zeroChartData}>
               <defs>
                 <linearGradient id="colorInvested" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -651,11 +774,11 @@ function App() {
 
         {/* Charts Grid - Row 1 */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "1.5rem", marginBottom: "3rem" }}>
-          <ChartCard theme={theme} title="Portfolio Allocation">
+          <ChartCard ref={allocRef} theme={theme} title="Portfolio Allocation" hasViewed={allocHasViewed}>
             <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
-                  data={portfolioAllocation}
+                  data={allocHasViewed ? portfolioAllocation : []}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
@@ -676,9 +799,9 @@ function App() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard theme={theme} title="Monthly Investment Trend">
+          <ChartCard ref={trendRef} theme={theme} title="Monthly Investment Trend" hasViewed={trendHasViewed}>
             <ResponsiveContainer width="100%" height={350}>
-              <ComposedChart data={monthlyTrend}>
+              <ComposedChart data={trendHasViewed ? monthlyTrend : zeroMonthlyTrend}>
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8} />
@@ -702,9 +825,9 @@ function App() {
 
         {/* Charts Grid - Row 2 */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "1.5rem", marginBottom: "3rem" }}>
-          <ChartCard theme={theme} title="SIP-wise Contribution (Stacked)">
+          <ChartCard ref={sipGrowthRef} theme={theme} title="SIP-wise Contribution (Stacked)" hasViewed={sipGrowthHasViewed}>
             <ResponsiveContainer width="100%" height={350}>
-              <AreaChart data={sipWiseGrowth}>
+              <AreaChart data={sipGrowthHasViewed ? sipWiseGrowth : zeroSipGrowth}>
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
                 <XAxis dataKey="month" angle={-45} textAnchor="end" height={100} stroke={theme.axisColor} style={{ fontSize: "0.7rem" }} />
                 <YAxis tickFormatter={(val) => `₹${val}`} stroke={theme.axisColor} />
@@ -720,42 +843,134 @@ function App() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard theme={theme} title="Monthly Profit/Loss">
+          <ChartCard ref={profitRef} theme={theme} title="Monthly Profit/Loss" hasViewed={profitHasViewed}>
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={monthlyProfits.filter((p) => p.profit !== 0)}>
+              <ComposedChart data={profitHasViewed ? filteredMonthlyProfits : []}>
                 <defs>
-                  <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
-                    <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                  <linearGradient id="profitAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
                   </linearGradient>
-                  <linearGradient id="lossGradient" x1="0" y1="1" x2="0" y2="0">
-                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8} />
-                    <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
+                  <linearGradient id="lossAreaGradient" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
                   </linearGradient>
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} opacity={0.3} />
                 <XAxis dataKey="month" angle={-45} textAnchor="end" height={100} stroke={theme.axisColor} style={{ fontSize: "0.7rem" }} />
                 <YAxis tickFormatter={(val) => `₹${val.toLocaleString("en-IN")}`} stroke={theme.axisColor} />
                 <Tooltip
-                  formatter={(val) => [`₹${val.toLocaleString("en-IN")}`, "Profit/Loss"]}
-                  contentStyle={{ background: theme.tooltipBg, border: `1px solid ${theme.tooltipBorder}`, color: theme.text, borderRadius: "0.5rem" }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const value = payload[0].value;
+                      const isProfit = value >= 0;
+                      return (
+                        <div
+                          style={{
+                            background: theme.tooltipBg,
+                            border: `2px solid ${isProfit ? "#10b981" : "#ef4444"}`,
+                            borderRadius: "0.75rem",
+                            padding: "1rem",
+                            color: theme.text,
+                            boxShadow: "0 8px 16px rgba(0,0,0,0.15)",
+                          }}
+                        >
+                          <div style={{ fontWeight: "bold", marginBottom: "0.5rem", fontSize: "0.875rem" }}>
+                            {payload[0].payload.month}
+                          </div>
+                          <div style={{ 
+                            color: isProfit ? "#10b981" : "#ef4444", 
+                            fontWeight: "bold", 
+                            fontSize: "1.125rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem"
+                          }}>
+                            {isProfit ? "+" : ""}₹{value.toLocaleString("en-IN")}
+                            {isProfit ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                          </div>
+                          <div style={{ fontSize: "0.75rem", color: theme.mutedText, marginTop: "0.25rem" }}>
+                            {isProfit ? "Profit" : "Loss"}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
                 />
-                <ReferenceLine y={0} stroke={theme.axisColor} />
-                <Bar dataKey="profit" name="Monthly P/L" radius={[8, 8, 8, 8]}>
-                  {monthlyProfits.filter((p) => p.profit !== 0).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? "url(#profitGradient)" : "url(#lossGradient)"} />
+                <ReferenceLine y={0} stroke={theme.axisColor} strokeWidth={2} strokeDasharray="5 5" />
+                <Area
+                  type="monotone"
+                  dataKey="profit"
+                  stroke="none"
+                  fill="url(#profitAreaGradient)"
+                  fillOpacity={1}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="profit"
+                  strokeWidth={3}
+                  dot={(props) => {
+                    const { cx, cy, payload } = props;
+                    const isProfit = payload.profit >= 0;
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={6}
+                        fill={isProfit ? "#10b981" : "#ef4444"}
+                        stroke={isDarkMode ? "#1e293b" : "white"}
+                        strokeWidth={3}
+                        style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))" }}
+                      />
+                    );
+                  }}
+                  activeDot={(props) => {
+                    const { cx, cy, payload } = props;
+                    const isProfit = payload.profit >= 0;
+                    return (
+                      <g>
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={12}
+                          fill={isProfit ? "#10b981" : "#ef4444"}
+                          fillOpacity={0.2}
+                        />
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={8}
+                          fill={isProfit ? "#10b981" : "#ef4444"}
+                          stroke={isDarkMode ? "#1e293b" : "white"}
+                          strokeWidth={3}
+                        />
+                      </g>
+                    );
+                  }}
+                  name="Monthly P/L"
+                >
+                  {filteredMonthlyProfits.map((entry, index) => (
+                    <Cell key={`cell-${index}`} stroke={entry.profit >= 0 ? "#10b981" : "#ef4444"} />
                   ))}
-                </Bar>
-              </BarChart>
+                </Line>
+              </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
         </div>
 
         {/* Charts Grid - Row 3 */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "1.5rem", marginBottom: "3rem" }}>
-          <ChartCard theme={theme} title="Returns Comparison (%)">
+          <ChartCard ref={returnsRef} theme={theme} title="Returns Comparison (%)" hasViewed={returnsHasViewed}>
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={returnsComparison} layout="vertical">
+              <BarChart data={returnsHasViewed ? returnsComparison : []} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
                 <XAxis type="number" tickFormatter={(val) => `${val}%`} stroke={theme.axisColor} />
                 <YAxis type="category" dataKey="name" width={150} stroke={theme.axisColor} style={{ fontSize: "0.875rem" }} />
@@ -773,11 +988,11 @@ function App() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard theme={theme} title="Year-wise Investment Distribution">
+          <ChartCard ref={yearRef} theme={theme} title="Year-wise Investment Distribution" hasViewed={yearHasViewed}>
             <ResponsiveContainer width="100%" height={350}>
               <PieChart>
                 <Pie
-                  data={yearWiseInvestment}
+                  data={yearHasViewed ? yearWiseInvestment : []}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
@@ -801,9 +1016,9 @@ function App() {
         </div>
 
         {/* Monthly SIP Flow */}
-        <ChartCard theme={theme} title="Monthly SIP Flow (Non-Cumulative)">
+        <ChartCard ref={flowRef} theme={theme} title="Monthly SIP Flow (Non-Cumulative)" hasViewed={flowHasViewed}>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={monthlySipFlow}>
+            <LineChart data={flowHasViewed ? monthlySipFlow : zeroSipFlow}>
               <defs>
                 <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#8b5cf6" />
@@ -823,7 +1038,7 @@ function App() {
         </ChartCard>
 
         {/* Table */}
-        <div style={{ background: theme.cardBg, borderRadius: "1rem", padding: "2rem", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", border: `1px solid ${theme.cardBorder}` }}>
+        <div ref={tableRef} style={{ background: theme.cardBg, borderRadius: "1rem", padding: "2rem", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", border: `1px solid ${theme.cardBorder}`, opacity: tableHasViewed ? 1 : 0, transform: tableHasViewed ? 'translateY(0)' : 'translateY(30px)', transition: 'opacity 0.6s ease-out, transform 0.6s ease-out' }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1.5rem", color: theme.text }}>Investment Details</h2>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "1200px" }}>
