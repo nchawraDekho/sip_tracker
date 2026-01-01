@@ -624,7 +624,9 @@ function App() {
       const y = parseInt(yStr);
       const dataPoint = { year: yStr, totalProfit: 0 };
       let totalYearProfit = 0;
+
       funds.forEach((name) => {
+        // Get all entries for this fund, sorted by date
         const fundEntries = sips
           .filter((s) => s.sipName === name)
           .sort(
@@ -632,20 +634,50 @@ function App() {
               a.year - b.year ||
               MONTH_OPTIONS.indexOf(a.month) - MONTH_OPTIONS.indexOf(b.month)
           );
-        const yearEntries = fundEntries.filter((e) => e.year === y);
+
+        // Get entries for previous year, current year, and next year
+        const prevYearEntries = fundEntries.filter((e) => e.year === y - 1);
+        const currentYearEntries = fundEntries.filter((e) => e.year === y);
+        const nextYearEntries = fundEntries.filter((e) => e.year === y + 1);
         let profit = 0;
-        if (yearEntries.length > 0) {
-          let starting = 0;
-          const prevEntries = fundEntries.filter((e) => e.year < y);
-          if (prevEntries.length > 0)
-            starting = prevEntries[prevEntries.length - 1].currentAmount;
-          const ending = yearEntries[yearEntries.length - 1].currentAmount;
-          const invested = yearEntries.reduce((acc, e) => acc + e.amount, 0);
+
+        // Only calculate if there are entries in current year
+        if (currentYearEntries.length > 0) {
+          // Starting value = last entry of previous year (or 0 if no previous year)
+          const starting =
+            prevYearEntries.length > 0
+              ? prevYearEntries[prevYearEntries.length - 1].currentAmount
+              : 0;
+
+          let ending;
+          let invested;
+
+          // If next year has data, use it to calculate ending value
+          if (nextYearEntries.length > 0) {
+            const firstNextYearEntry = nextYearEntries[0];
+            // Ending = first entry of next year's current - first entry of next year's investment
+            ending =
+              firstNextYearEntry.currentAmount - firstNextYearEntry.amount;
+            // Invested = all investments made in current year
+            invested = currentYearEntries.reduce((sum, e) => sum + e.amount, 0);
+            console.log(`    Has next year data`);
+          } else {
+            // No next year data means we just invested this year but no growth yet
+            ending = starting;
+            invested = 0;
+            console.log(`    NO next year data - setting profit to 0`);
+          }
+
           profit = ending - starting - invested;
+          console.log(
+            `    PROFIT: ${profit} = ${ending} - ${starting} - ${invested}`
+          );
         }
+
         dataPoint[name] = profit;
         totalYearProfit += profit;
       });
+
       dataPoint.totalProfit = totalYearProfit;
       return dataPoint;
     });
@@ -1535,51 +1567,6 @@ function App() {
           }}
         >
           <ChartCard
-            ref={returnsRef}
-            theme={theme}
-            title="Returns Comparison (%)"
-            hasViewed={returnsHasViewed}
-          >
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart
-                data={returnsHasViewed ? calculations.returnsComparison : []}
-                layout="vertical"
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
-                <XAxis
-                  type="number"
-                  tickFormatter={(val) => `${val}%`}
-                  stroke={theme.axisColor}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={150}
-                  stroke={theme.axisColor}
-                  style={{ fontSize: "0.875rem" }}
-                />
-                <Tooltip
-                  formatter={(val) => `${val}%`}
-                  contentStyle={{
-                    background: theme.tooltipBg,
-                    border: `1px solid ${theme.tooltipBorder}`,
-                    color: theme.text,
-                    borderRadius: "0.5rem",
-                  }}
-                />
-                <ReferenceLine x={0} stroke={theme.axisColor} />
-                <Bar dataKey="returns" name="Returns %" radius={[0, 8, 8, 0]}>
-                  {calculations.returnsComparison.map((entry, idx) => (
-                    <Cell
-                      key={`cell-${idx}`}
-                      fill={entry.returns >= 0 ? "#10b981" : "#ef4444"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard
             ref={yearRef}
             theme={theme}
             title="Year-wise Investment Distribution"
@@ -1619,64 +1606,61 @@ function App() {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>
-        </div>
-
-        {/* Yearly Profit Stacked Bar */}
-        <ChartCard
-          ref={yearProfitRef}
-          theme={theme}
-          title="Yearly Profit by Fund (Stacked)"
-          hasViewed={yearProfitHasViewed}
-        >
-          <ResponsiveContainer width="100%" height={350}>
-            <ComposedChart
-              data={
-                yearProfitHasViewed
-                  ? calculations.yearlyProfits
-                  : calculations.zeroYearlyProfits
-              }
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
-              <XAxis dataKey="year" stroke={theme.axisColor} />
-              <YAxis
-                tickFormatter={(val) => `₹${val.toLocaleString("en-IN")}`}
-                stroke={theme.axisColor}
-              />
-              <Tooltip
-                formatter={(val) => `₹${val.toLocaleString("en-IN")}`}
-                contentStyle={{
-                  background: theme.tooltipBg,
-                  border: `1px solid ${theme.tooltipBorder}`,
-                  color: theme.text,
-                  borderRadius: "0.5rem",
-                }}
-              />
-              <Legend wrapperStyle={{ color: theme.text }} />
-              <ReferenceLine
-                y={0}
-                stroke={theme.axisColor}
-                strokeDasharray="3 3"
-              />
-              {calculations.funds.map((name, idx) => (
-                <Bar
-                  key={name}
-                  dataKey={name}
-                  stackId="profit"
-                  fill={COLORS[idx % COLORS.length]}
+          <ChartCard
+            ref={yearProfitRef}
+            theme={theme}
+            title="Yearly Profit by Fund (Stacked)"
+            hasViewed={yearProfitHasViewed}
+          >
+            <ResponsiveContainer width="100%" height={350}>
+              <ComposedChart
+                data={
+                  yearProfitHasViewed
+                    ? calculations.yearlyProfits
+                    : calculations.zeroYearlyProfits
+                }
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
+                <XAxis dataKey="year" stroke={theme.axisColor} />
+                <YAxis
+                  tickFormatter={(val) => `₹${val.toLocaleString("en-IN")}`}
+                  stroke={theme.axisColor}
                 />
-              ))}
-              <Line
-                type="monotone"
-                dataKey="totalProfit"
-                stroke="#f59e0b"
-                strokeWidth={3}
-                dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
-                name="Total Profit"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
+                <Tooltip
+                  formatter={(val) => `₹${val.toLocaleString("en-IN")}`}
+                  contentStyle={{
+                    background: theme.tooltipBg,
+                    border: `1px solid ${theme.tooltipBorder}`,
+                    color: theme.text,
+                    borderRadius: "0.5rem",
+                  }}
+                />
+                <Legend wrapperStyle={{ color: theme.text }} />
+                <ReferenceLine
+                  y={0}
+                  stroke={theme.axisColor}
+                  strokeDasharray="3 3"
+                />
+                {calculations.funds.map((name, idx) => (
+                  <Bar
+                    key={name}
+                    dataKey={name}
+                    stackId="profit"
+                    fill={COLORS[idx % COLORS.length]}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="totalProfit"
+                  stroke="#f59e0b"
+                  strokeWidth={3}
+                  dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
+                  name="Total Profit"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </div>
         {/* Table */}
         <div
           ref={tableRef}
